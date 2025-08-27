@@ -30,12 +30,13 @@ var shielded: bool = false
 var tiles: Tiles
 
 # Component controllers
+var movement: MovementController
 var stats: Stats = Stats.new()
 var gravity: Gravity = Gravity.new()
 var super_jump: SuperJump = SuperJump.new()
 var camera_controller: CameraController
 var lightbreak: LightbreakController
-var movement: MovementController
+
 var animation: AnimationController
 var tile_interaction: TileInteractionController
 var control_vector: Vector2
@@ -46,9 +47,9 @@ func _ready() -> void:
 	# Initialize all the controllers
 	camera_controller = CameraController.new(camera)
 	lightbreak = LightbreakController.new(light, sun_particles, moon_particles)
-	movement = MovementController.new(ice)
 	animation = AnimationController.new(display, sjaura)
 	
+	movement = find_child("Input")
 
 func init(tiles_node: Tiles) -> void:
 	tiles = tiles_node
@@ -56,7 +57,7 @@ func init(tiles_node: Tiles) -> void:
 	tile_interaction.last_safe_position = Vector2(position)
 
 
-func _physics_process(delta: float) -> void:
+func _rollback_tick(delta, _tick, _is_fresh):
 	if not active or not tile_interaction:
 		return
 	
@@ -71,7 +72,7 @@ func _physics_process(delta: float) -> void:
 	
 	# Update velocity from super jump
 	if not movement.hurt and gravity.not_rotating(delta):
-		super_jump.run(self, delta)
+		super_jump.run(self, delta, movement.down_pressed)
 	
 	# Process item forces
 	_process_item_forces(delta)
@@ -80,15 +81,16 @@ func _physics_process(delta: float) -> void:
 	velocity = movement.process(delta, self, stats, gravity, super_jump)
 	
 	# Process lightbreak
-	control_vector = Input.get_vector("left", "right", "up", "down")
-	var lightbreak_velocity := lightbreak.process(delta, control_vector, self)
+	var lightbreak_velocity := lightbreak.process(delta,  movement.control_vector, self)
 	if lightbreak_velocity != Vector2.ZERO:
 		velocity = lightbreak_velocity
 	
 	# Move the character if we're not rotating
 	if gravity.not_rotating(delta):
 		movement.previous_velocity = velocity
+		velocity *= NetworkTime.physics_factor
 		move_and_slide()
+		velocity /= NetworkTime.physics_factor
 	
 	# Interact with tiles
 	tile_interaction.interact_with_incoporeal_tiles(self)
@@ -106,7 +108,7 @@ func _physics_process(delta: float) -> void:
 	
 	# Update animations
 	scale = movement.size
-	animation.process(self, movement, super_jump)
+	animation.process(self, movement, super_jump, movement.control_vector)
 	
 	# Check boundaries
 	tile_interaction.check_out_of_bounds(self)
@@ -125,7 +127,7 @@ func _process_item_forces(delta: float) -> void:
 
 func _process_items(delta: float) -> void:
 	# Use items
-	if not movement.hurt and Input.is_action_pressed("item"):
+	if not movement.hurt and movement.item_pressed:
 		item_manager.use(delta)
 	
 	# Check item state
@@ -160,9 +162,14 @@ func set_depth(depth: int) -> void:
 	tile_interaction.set_depth(self, depth)
 
 
-func set_item(new_item_id: int) -> void:
-	item_manager.set_item_id(new_item_id, self)
-
+func set_item() -> void:
+	if is_multiplayer_authority():
+		var new_item_id = randi_range(1, 14)
+		_set_item_rpc.rpc(new_item_id)
 
 func get_tiles_overlapping_area(area: Area2D) -> Array:
 	return tile_interaction.get_tiles_overlapping_area(area)
+
+@rpc("authority", "reliable", "call_local")
+func _set_item_rpc(new_item_id: int):
+	item_manager.set_item_id(new_item_id, self)

@@ -10,7 +10,7 @@ static var game: Node2D
 
 var used_rects: Dictionary = {}
 var current_player_layer: String = ""
-
+var characters: Dictionary = {}
 
 func set_used_rect(layer_name: String, rect: Rect2i) -> void:
 	used_rects[layer_name] = rect
@@ -38,6 +38,13 @@ static func get_target_layer_node() -> Node:
 	
 
 func _ready():
+	NetworkEvents.on_client_start.connect(_handle_connected)
+	NetworkEvents.on_server_start.connect(_handle_host)
+	NetworkEvents.on_peer_join.connect(_handle_new_peer)
+	NetworkEvents.on_peer_leave.connect(_handle_leave)
+	NetworkEvents.on_client_stop.connect(_handle_stop)
+	NetworkEvents.on_server_stop.connect(_handle_stop)
+	
 	back_button.connect("pressed", _on_back_pressed)
 	
 	var penciler: Node2D = get_node("Penciler")
@@ -75,7 +82,7 @@ func _activate_game() -> void:
 	var player_manager: PlayerManager = get_node("PlayerManager")
 	
 	level_manager.activate_node()
-	var character = player_manager.spawn_player(level_manager.layers, level_manager.tiles)
+	#player_manager.spawn_player(level_manager.layers, level_manager.tiles)
 	
 	minimap.init(self)
 	level_manager.calc_used_rect()
@@ -93,3 +100,46 @@ func _exit_tree():
 
 func _on_back_pressed():
 	Main.set_scene(Main.TITLE)
+	
+func _handle_connected(id: int):
+	# Spawn an character for us
+	_spawn(id)
+
+func _handle_host():
+	# Spawn own character on host machine
+	_spawn(1)
+
+func _handle_new_peer(id: int):
+	# Spawn an character for new player
+	var character = _spawn(id)
+	var camera: Camera2D = character.find_child("Camera")
+	camera.enabled = false
+
+func _handle_leave(id: int):
+	if not characters.has(id):
+		return
+	
+	var character = characters[id] as Node
+	character.queue_free()
+	characters.erase(id)
+
+func _handle_stop():
+	# Remove all characters on game end
+	for character in characters.values():
+		character.queue_free()
+	characters.clear()
+
+func _spawn(id: int) -> CharacterBody2D:
+	var player_manager: PlayerManager = get_node("PlayerManager")
+	var character =  player_manager.spawn_player(level_manager.layers, level_manager.tiles)
+		
+	characters[id] = character
+	character.name += " #%d" % id
+	
+	# Character is always owned by server
+	character.set_multiplayer_authority(1)
+
+	# Character's input object is owned by player
+	var input = character.find_child("Input")
+	input.set_multiplayer_authority(id)
+	return character

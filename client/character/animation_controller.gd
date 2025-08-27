@@ -13,9 +13,8 @@ func _init(character_display: Node2D, super_jump_aura: Node2D):
 	sjaura = super_jump_aura
 
 
-func process(character: Character, movement: MovementController, super_jump: SuperJump):
+func process(character: Character, movement: MovementController, super_jump: SuperJump, control_vector: Vector2):
 	# Face left or right
-	var control_vector = Input.get_vector("left", "right", "up", "down")
 	if !movement.hurt:
 		display.scale.x = movement.facing
 	else:

@@ -14,8 +14,7 @@ func dispense_item(player: Node2D, tile_map_layer: TileMapLayer, coords: Vector2
 		return
 	
 	# grant an item
-	item_id = randi_range(1, 14)
-	player.set_item(item_id)
+	player.set_item()
 	
 	# deactivate this tile
 	deactivate(tile_map_layer, coords)

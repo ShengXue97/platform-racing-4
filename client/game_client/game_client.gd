@@ -33,7 +33,7 @@ var layers: Node2D = null
 var editor_explore_button: Button = null
 var editor_load_button: Button = null
 var editor_clear_button: Button = null
-var is_scale_multiple_instances = false
+var is_scale_multiple_instances = true
 
 func _ready() -> void:
 	connect_timer.timeout.connect(_attempt_connect, true)

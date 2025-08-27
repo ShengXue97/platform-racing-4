@@ -8,7 +8,7 @@ var charge_timer: float = 0.0
 var sjanim_timer: float = 0.0
 
 
-func run(character: Character, delta: float) -> void:
+func run(character: Character, delta: float, down_pressed: bool) -> void:
 	# no super jumps if we're not on the ground (or crouching)
 	if !character.is_on_floor():
 		charge_timer = 0
@@ -16,7 +16,7 @@ func run(character: Character, delta: float) -> void:
 		return
 	
 	# not charging
-	if !Input.is_action_pressed("down"):
+	if !down_pressed:
 		if !character.movement.is_crouching and charge_timer >= GameConfig.get_value("super_jump_min_charge_threshold"): 
 			character.velocity += Vector2(0, GameConfig.get_value("super_jump_velocity")).rotated(character.rotation) * (
 					(charge_timer - GameConfig.get_value("super_jump_min_charge_threshold")) / 

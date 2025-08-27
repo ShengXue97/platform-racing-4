@@ -26,6 +26,15 @@ StringUtils="*res://singletons/string_utils.gd"
 Session="*res://singletons/session/session.gd"
 Jukebox="*res://singletons/jukebox/jukebox.tscn"
 CachingLoader="*res://singletons/caching_loader.gd"
+WindowTiler="*res://addons/netfox.extras/window-tiler.gd"
+Noray="*res://addons/netfox.noray/noray.gd"
+PacketHandshake="*res://addons/netfox.noray/packet-handshake.gd"
+NetworkTime="*res://addons/netfox/network-time.gd"
+NetworkTimeSynchronizer="*res://addons/netfox/network-time-synchronizer.gd"
+NetworkRollback="*res://addons/netfox/rollback/network-rollback.gd"
+NetworkEvents="*res://addons/netfox/network-events.gd"
+NetworkPerformance="*res://addons/netfox/network-performance.gd"
+Async="*res://shared/scripts/async.gd"
 
 [display]
 
@@ -34,6 +43,14 @@ window/size/viewport_height=1080
 window/size/initial_position_type=0
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[editor]
+
+version_control/autoload_on_startup=true
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/netfox.extras/plugin.cfg", "res://addons/netfox.internals/plugin.cfg", "res://addons/netfox.noray/plugin.cfg", "res://addons/netfox/plugin.cfg", "res://addons/vest/plugin.cfg")
 
 [gui]
 

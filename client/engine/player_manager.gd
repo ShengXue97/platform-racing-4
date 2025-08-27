@@ -5,7 +5,6 @@ const CHARACTER = preload("res://character/character.tscn")
 
 var character: CharacterBody2D
 
-
 func get_character() -> CharacterBody2D:
 	return character
 

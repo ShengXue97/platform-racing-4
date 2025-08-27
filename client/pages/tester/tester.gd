@@ -9,11 +9,9 @@ extends Node2D
 var current_player_layer: String = ""
 var used_rects: Dictionary = {}
 
-
 func _ready():
 	back.connect("pressed", _on_back_pressed)
 	Game.game = self
-
 
 func _on_back_pressed():
 	Main.set_scene(Main.LEVEL_EDITOR)
@@ -41,7 +39,7 @@ func init(data: Dictionary):
 	var start_option = Start.get_next_start_option(level_manager.layers)
 	if start_option:
 		var player_manager: PlayerManager = get_node("PlayerManager")
-		var character = player_manager.spawn_player(level_manager.layers, level_manager.tiles)
+		player_manager.spawn_player(level_manager.layers, level_manager.tiles)
 		current_player_layer = start_option.layer_name
 	
 	minimap.init(self)

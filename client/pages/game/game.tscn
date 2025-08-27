@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://ro82b48ln0gj"]
+[gd_scene load_steps=9 format=3 uid="uid://ro82b48ln0gj"]
 
 [ext_resource type="Script" uid="uid://budwhkljv22wv" path="res://pages/game/game.gd" id="1_cq41v"]
 [ext_resource type="PackedScene" uid="uid://c2pluv27fc2bv" path="res://engine/bg/bg.tscn" id="2_drtex"]
@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" uid="uid://e6aydemh5yb1" path="res://engine/penciler/penciler.tscn" id="6_x1v3o"]
 [ext_resource type="PackedScene" uid="uid://cwi7db32xkv2g" path="res://engine/player_manager.tscn" id="7_abcde"]
 [ext_resource type="PackedScene" uid="uid://c6gq7x1vjx1w" path="res://ui/minimap.tscn" id="7_yuilv"]
+[ext_resource type="PackedScene" uid="uid://badtpsxn5lago" path="res://shared/ui/network-popup.tscn" id="8_qygrs"]
 
 [node name="Game" type="Node2D"]
 script = ExtResource("1_cq41v")
@@ -64,3 +65,10 @@ offset_top = 0.199951
 offset_right = -0.800171
 offset_bottom = 0.519897
 text = "Back"
+
+[node name="Network Popup" parent="UI/Container" instance=ExtResource("8_qygrs")]
+layout_mode = 1
+offset_left = -180.0
+offset_top = -131.0
+offset_right = 180.0
+offset_bottom = 209.0

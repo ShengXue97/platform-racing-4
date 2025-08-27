@@ -1,3 +1,4 @@
+extends BaseNetInput
 class_name MovementController
 ## Controls character movement, including walking, jumping, and swimming.
 ## Handles physics, frozen status, and damage hitstun.
@@ -37,12 +38,38 @@ var can_wall_jump: bool = true
 var last_wall_jump_dir: int = 0
 var wall_slide_friction_timer: float = 0.25
 
+# Input state tracking
+var item_pressed: bool = false
+var jump_strength: int = 0
+var left_pressed: bool = false
+var right_pressed: bool = false
+var up_pressed: bool = false
+var down_pressed: bool = false
+var control_axis: float = 0
+var control_vector: Vector2 = Vector2(0, 0)
 
 func _init(ice_node = null):
 	frozen_display_node = ice_node
 
+func _ready():
+	NetworkTime.before_tick_loop.connect(_gather)
+
+func _gather():
+	if not is_multiplayer_authority():
+		return
+	
+	item_pressed = Input.is_action_pressed("item")
+	jump_strength = Input.get_action_strength("jump")
+	left_pressed = Input.is_action_pressed("left")
+	right_pressed = Input.is_action_pressed("right")
+	up_pressed = Input.is_action_pressed("up")
+	down_pressed = Input.is_action_pressed("down")
+	control_axis = Input.get_axis("left", "right")
+	control_vector = Input.get_vector("left", "right", "up", "down")
 
 func process(delta: float, character: Character, stats: Stats, gravity: Gravity, super_jump: SuperJump) -> Vector2:
+	_force_update_is_on_floor(character)
+	
 	var velocity = character.velocity
 	
 	if !attempting_bump:
@@ -72,7 +99,6 @@ func process(delta: float, character: Character, stats: Stats, gravity: Gravity,
 			hurt = false
 	
 	# Handle input for movement
-	var control_axis: float = Input.get_axis("left", "right")
 	if !hurt and control_axis < 0:
 		facing = -1
 	elif !hurt and control_axis > 0:
@@ -82,11 +108,15 @@ func process(delta: float, character: Character, stats: Stats, gravity: Gravity,
 	var not_rotating: bool = gravity.not_rotating(delta)
 
 	# Handle regular jump
-	if not hurt and can_jump and Input.is_action_pressed("jump"):
+	if not hurt and can_jump and jump_strength > 0:
 		if is_crouching:
 			_bump_tile_covering_high_area(character)
 		elif character.is_on_floor() and velocity.rotated(-character.rotation).y > GameConfig.get_value("player_jump_velocity") * GameConfig.get_value("player_jump_velocity_multiplier"):
 			jumped = true
+			
+			##TODO: REMOVE TEMP JUMP logic set to support multiplayer
+			velocity.y = (GameConfig.get_value("player_wall_jump_vertical_force") * stats.get_jump_bonus()) * stats.get_skill_bonus() * 2
+			
 			jump_timer = GameConfig.get_value("player_coyote_jump_time")
 			character.audioplayer.set_stream(JUMP_SOUND)
 			character.audioplayer.set_volume_db(1)
@@ -96,7 +126,7 @@ func process(delta: float, character: Character, stats: Stats, gravity: Gravity,
 	if character.is_on_floor() or swimming:
 		is_wall_sliding = false
 		wall_sliding_dir = 0
-		can_wall_jump = true  # Reset wall jump after touching the ground
+		can_wall_jump = true # Reset wall jump after touching the ground
 		last_wall_jump_dir = 0
 		wall_slide_friction_timer = GameConfig.get_value("player_wall_slide_friction_decay_time")
 	
@@ -104,10 +134,10 @@ func process(delta: float, character: Character, stats: Stats, gravity: Gravity,
 	if not_rotating and not character.is_on_floor() and not swimming:
 		# Check for wall sliding on right walls
 		if character.is_on_wall() and character.get_wall_normal().rotated(-character.rotation).x < -0.7 and last_wall_jump_dir != 1:
-			if control_axis > 0 or (control_axis == 0 and Input.is_action_pressed("left")) or wall_sliding_dir == 1:  # Pressing against the wall
+			if control_axis > 0 or (control_axis == 0 and left_pressed) or wall_sliding_dir == 1: # Pressing against the wall
 				is_wall_sliding = true
 				wall_sliding_dir = 1
-				if last_wall_jump_dir != 1:  # Only allow wall jump if last jump wasn't from same side
+				if last_wall_jump_dir != 1: # Only allow wall jump if last jump wasn't from same side
 					can_wall_jump = true
 			else:
 				is_wall_sliding = false
@@ -115,10 +145,10 @@ func process(delta: float, character: Character, stats: Stats, gravity: Gravity,
 		
 		# Check for wall sliding on left walls
 		elif character.is_on_wall() and character.get_wall_normal().rotated(-character.rotation).x > 0.7 and last_wall_jump_dir != -1:
-			if control_axis < 0 or (control_axis == 0 and Input.is_action_pressed("right")) or wall_sliding_dir == -1:  # Pressing against the wall
+			if control_axis < 0 or (control_axis == 0 and right_pressed) or wall_sliding_dir == -1: # Pressing against the wall
 				is_wall_sliding = true
 				wall_sliding_dir = -1
-				if last_wall_jump_dir != -1:  # Only allow wall jump if last jump wasn't from same side
+				if last_wall_jump_dir != -1: # Only allow wall jump if last jump wasn't from same side
 					can_wall_jump = true
 			else:
 				is_wall_sliding = false
@@ -129,7 +159,7 @@ func process(delta: float, character: Character, stats: Stats, gravity: Gravity,
 	
 	# Check for wall jump with opposite direction input
 	if not hurt and can_jump and is_wall_sliding and can_wall_jump:
-		var opposite_direction_pressed = (wall_sliding_dir > 0 and Input.is_action_pressed("left")) or (wall_sliding_dir < 0 and Input.is_action_pressed("right"))
+		var opposite_direction_pressed = (wall_sliding_dir > 0 and left_pressed) or (wall_sliding_dir < 0 and right_pressed)
 		
 		# Wall jump if jump button is pressed OR if opposite direction is pressed
 		if Input.is_action_just_pressed("jump") or opposite_direction_pressed:
@@ -145,11 +175,13 @@ func process(delta: float, character: Character, stats: Stats, gravity: Gravity,
 
 	# Handle jump strength/velocity increment for regular jumps
 	if not_rotating and jumped:
-		velocity += Vector2(0, GameConfig.get_value("player_jump_velocity")).rotated(character.rotation) * stats.get_jump_bonus() * (jump_timer / GameConfig.get_value("player_coyote_jump_time"))
-		jump_timer -= 1
-		if jump_timer <= 0:
-			jumped = false
-			jump_timer = 0
+		## TODO: add back jump logic for multiplayer
+		pass
+		#velocity += Vector2(0, GameConfig.get_value("player_jump_velocity")).rotated(character.rotation) * stats.get_jump_bonus() * (jump_timer / GameConfig.get_value("player_coyote_jump_time"))
+		#jump_timer -= 1
+		#if jump_timer <= 0:
+			#jumped = false
+			#jump_timer = 0
 			
 	# Caps velocity to reasonable limits
 	velocity = _cap_velocity(velocity)
@@ -163,11 +195,12 @@ func process(delta: float, character: Character, stats: Stats, gravity: Gravity,
 				var friction_factor = wall_slide_friction_timer / GameConfig.get_value("player_wall_slide_friction_decay_time")
 				velocity.y *= 1 - (GameConfig.get_value("player_wall_slide_friction") * friction_factor)
 			
+		## TODO: add back jump logic for multiplayer
 		# Cancel jump early by not pressing jump
-		if jumped and not Input.is_action_pressed("jump"):
-			jumped = false
+		#if jumped and jump_strength <= 0:
+			#jumped = false
 		# Fastfall; if down pressed while not on floor, fall faster. also cancels wall slide
-		if !hurt and Input.is_action_pressed("down"):
+		if !hurt and down_pressed:
 			if swimming:
 				velocity += (FASTFALL_VELOCITY / 2).rotated(character.rotation)
 			else:
@@ -175,7 +208,7 @@ func process(delta: float, character: Character, stats: Stats, gravity: Gravity,
 			is_wall_sliding = false
 			wall_sliding_dir = 0
 		# Swimming up
-		if !hurt and swimming and Input.is_action_pressed("up"):
+		if !hurt and swimming and up_pressed:
 			velocity += Vector2(0, -GameConfig.get_value("player_speed") * GameConfig.get_value("player_swim_up_velocity_multiplier")).rotated(character.rotation) * delta
 		# Extra jump is gone after releasing jump button
 		if not jumped:
@@ -188,7 +221,7 @@ func process(delta: float, character: Character, stats: Stats, gravity: Gravity,
 		if !hurt and is_crouching:
 			control_axis = control_axis / 2
 			
-		var target_velocity = Vector2(control_axis * (GameConfig.get_value("player_speed") * speedburst_boost) * stats.get_speed_bonus(), 
+		var target_velocity = Vector2(control_axis * (GameConfig.get_value("player_speed") * speedburst_boost) * stats.get_speed_bonus(),
 			velocity.rotated(-character.rotation).y).rotated(character.rotation)
 		
 		accel = (0.05 + ((1.45 / 100) * stats.get_exact_accel())) * speedburst_boost
@@ -252,3 +285,9 @@ func hitstun(duration: float, has_shield: bool):
 		frozen_timer = 0
 		frozen = false
 		hurt = true
+
+func _force_update_is_on_floor(character: Character):
+	var old_velocity = character.velocity
+	character.velocity = Vector2.ZERO
+	character.move_and_slide()
+	character.velocity = old_velocity
